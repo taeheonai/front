@@ -20,7 +20,6 @@ export default function GRIIntakePage() {
     setSessionKey, 
     setAnswer, 
     answers,
-    setPolished,
     lastSavedAt 
   } = useGriStore();
 

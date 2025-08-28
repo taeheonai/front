@@ -6,11 +6,6 @@ import Navigation from '@/components/Navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useGriStore } from '@/store/useGriStore';
-import GRIApiService from '@/lib/griApi';
-
-interface PolishResponse {
-  polished_text: string;
-}
 
 export default function GriReportPage() {
   const user = useAuthStore((s) => s.user);
@@ -30,16 +25,10 @@ export default function GriReportPage() {
     const loadPolishedData = async () => {
       setIsLoading(true);
       try {
-        for (const idx of indices) {
-          if (!polishedByIndex[idx]) {
-            // 임시로 주석 처리 (API 메서드 구현 필요)
-            /*const r = await GRIApiService.getPolishedText(sessionKey, idx) as PolishResponse;
-            if (r?.polished_text) setPolished(idx, r.polished_text);*/
-          }
-        }
+        // TODO: API 구현 후 복구 로직 추가
+        setIsLoading(false);
       } catch (error) {
         console.error('윤문 데이터 로드 오류:', error);
-      } finally {
         setIsLoading(false);
       }
     };
