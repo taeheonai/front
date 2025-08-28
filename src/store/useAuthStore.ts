@@ -1,6 +1,6 @@
 'use client';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 type User = { 
   id: string; 
@@ -25,8 +25,12 @@ export const useAuthStore = create<AuthState>()(
       clear: () => set({ user: null, isAuthenticated: false }),
     }),
     {
-      name: 'auth-store-v1', // localStorage key
-      partialize: (s) => ({ user: s.user, isAuthenticated: s.isAuthenticated }),
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated
+      }),
       version: 1,
     }
   )

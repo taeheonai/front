@@ -1,6 +1,6 @@
 'use client';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 type Answers = Record<string /*question_id*/, string>;
 type Polished = Record<string /*gri_index*/, string>;
@@ -30,26 +30,44 @@ export const useGriStore = create<GriState>()(
       selectedItemId: null,
       answers: {},
       polishedByIndex: {},
+      lastSavedAt: undefined,
 
       setSessionKey: (k) => set({ sessionKey: k }),
       setSelected: (catId, itemId) => set({ selectedCategoryId: catId, selectedItemId: itemId }),
-      setAnswer: (qid, val) => set({ answers: { ...get().answers, [qid]: val } }),
-      setBulkAnswers: (a) => set({ answers: { ...get().answers, ...a } }),
-      setPolished: (idx, text) => set({ polishedByIndex: { ...get().polishedByIndex, [idx]: text } }),
+      setAnswer: (qid, val) => set({ 
+        answers: { ...get().answers, [qid]: val },
+        lastSavedAt: new Date().toISOString()
+      }),
+      setBulkAnswers: (a) => set({ 
+        answers: { ...get().answers, ...a },
+        lastSavedAt: new Date().toISOString()
+      }),
+      setPolished: (idx, text) => set({ 
+        polishedByIndex: { ...get().polishedByIndex, [idx]: text },
+        lastSavedAt: new Date().toISOString()
+      }),
       resetItemAnswers: () => set({ answers: {} }),
-      resetAll: () => set({ sessionKey: null, selectedCategoryId: null, selectedItemId: null, answers: {}, polishedByIndex: {} }),
+      resetAll: () => set({ 
+        sessionKey: null, 
+        selectedCategoryId: null, 
+        selectedItemId: null, 
+        answers: {}, 
+        polishedByIndex: {},
+        lastSavedAt: undefined
+      }),
     }),
     {
-      name: 'gri-store-v1',
-      version: 1,
-      partialize: (s) => ({
-        sessionKey: s.sessionKey,
-        selectedCategoryId: s.selectedCategoryId,
-        selectedItemId: s.selectedItemId,
-        answers: s.answers,
-        polishedByIndex: s.polishedByIndex,
-        lastSavedAt: s.lastSavedAt,
+      name: 'gri-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        sessionKey: state.sessionKey,
+        selectedCategoryId: state.selectedCategoryId,
+        selectedItemId: state.selectedItemId,
+        answers: state.answers,
+        polishedByIndex: state.polishedByIndex,
+        lastSavedAt: state.lastSavedAt,
       }),
+      version: 1,
     }
   )
 );
