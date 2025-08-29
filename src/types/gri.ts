@@ -65,7 +65,7 @@ export interface PolishRequest {
     key_alpha: string;
     text: string;
   }>;
-  prompt_profile?: string;
+  extra_instructions?: string;
 }
 
 export interface PolishResponse {
@@ -73,9 +73,6 @@ export interface PolishResponse {
   data: {
     polished_text: string;
     model?: string;
-    prompt_hash?: string;
-    input_tokens?: number;
-    output_tokens?: number;
     created_at?: string;
   };
 }

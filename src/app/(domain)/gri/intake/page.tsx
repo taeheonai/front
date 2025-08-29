@@ -139,8 +139,6 @@ export default function GRIIntakePage() {
             key_alpha: q.key_alpha,
             text: answers[q.id.toString()].trim()
           })),
-        style: "중립",
-        audience: "실무자",
         extra_instructions: "kor_gri_v1"  // prompt_profile을 extra_instructions로 변경
       });
 
@@ -409,6 +407,17 @@ export default function GRIIntakePage() {
                             showSaveHint
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {/* 🔧 윤문 결과가 없을 때만 PolishResult 컴포넌트 렌더링 (API 호출 방지) */}
+                    {selectedItem && sessionKey && (
+                      <div className="mt-12">
+                        <PolishResult 
+                          sessionKey={sessionKey} 
+                          griIndex={selectedItem.index_no}
+                          showSaveHint={false}
+                        />
                       </div>
                     )}
                   </>

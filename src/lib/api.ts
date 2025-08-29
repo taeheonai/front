@@ -282,13 +282,12 @@ export async function searchCorporations(query: string, limit: number = 20) {
 export async function polishGriAnswer(payload: {
   session_key: string;
   gri_index: string;
-  item_title: string;
   answers: Array<{
     question_id: number;
     key_alpha: string;
     text: string;
   }>;
-  prompt_profile?: string;
+  
 }) {
   return api.post('/v1/gri/polish', payload);  // Gateway를 통한 요청
 }
