@@ -1,13 +1,13 @@
 // frontend/src/lib/api/issuepool.ts
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8002';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://taeheonai-production-2130.up.railway.app/api';
 
 export interface IssuePool {
   id: number;
   corporation_id: number;
-  publish_year: number;
-  ranking: number;
+  publish_year: string;
+  ranking: string;
   issue_pool: string;
   category_id: number;
   esg_classification_id: number;
@@ -15,8 +15,8 @@ export interface IssuePool {
 
 export interface IssuePoolCreateRequest {
   corporation_id: number;
-  publish_year: number;
-  ranking: number;
+  publish_year: string;
+  ranking: string;
   issue_pool: string;
   category_id: number;
   esg_classification_id: number;
@@ -24,8 +24,8 @@ export interface IssuePoolCreateRequest {
 
 export interface IssuePoolUpdateRequest {
   corporation_id: number;
-  publish_year: number;
-  ranking: number;
+  publish_year: string;
+  ranking: string;
   issue_pool: string;
   category_id: number;
   esg_classification_id: number;
@@ -33,14 +33,14 @@ export interface IssuePoolUpdateRequest {
 
 export interface IssuePoolFilter {
   corporation_id?: number;
-  publish_year?: number;
+  publish_year?: string;
   category_id?: number;
   esg_classification_id?: number;
 }
 
 // IssuePool API 클래스
 export class IssuePoolAPI {
-  private static baseURL = `${API_BASE_URL}/api/v1/issuepools`;
+  private static baseURL = `${API_BASE_URL}/v1/materiality`;
 
   // 랜덤 IssuePool 10개 조회 (새로운 엔드포인트)
   static async getRandomIssuePools(limit: number = 10): Promise<IssuePool[]> {
@@ -75,7 +75,7 @@ export class IssuePoolAPI {
 
   static async getIssuePoolsByCorporationAndYear(
     corporationId: number, 
-    publishYear: number
+    publishYear: string
   ): Promise<IssuePool[]> {
     const response = await axios.get(
       `${this.baseURL}/corporation/${corporationId}/year/${publishYear}`
@@ -93,3 +93,4 @@ export class IssuePoolAPI {
     return response.data;
   }
 }
+
