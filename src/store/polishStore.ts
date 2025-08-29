@@ -55,23 +55,31 @@ export const usePolishStore = create<PolishState>((set, get) => ({
       return;
     }
 
+    // ✅ 배치 업데이트: loading 상태만 먼저 설정
     set({ status: 'loading', error: undefined });
+    
     try {
-      const data = await GRIApiService.getPolishResult(sessionKey, griIndex); // 📖 GET
-      if (!data) {
-        // 🔧 데이터가 없는 경우를 명확한 상태로 관리
+      const response = await GRIApiService.getPolishResult(sessionKey, griIndex); // 📖 GET
+      
+      // ✅ 결과에 따라 한 번에 상태 업데이트 (다중 set 방지)
+      if (response.exists && response.data) {
+        set({ 
+          status: 'success', 
+          result: response.data, 
+          error: undefined 
+        });
+      } else {
+        // ✅ 데이터가 없는 경우를 정상 상태로 처리
         set({ 
           status: 'not_found', 
-          error: '저장된 윤문 결과가 없습니다.',
+          error: '아직 윤문 결과가 없습니다. 윤문을 실행해주세요.',
           result: undefined 
         });
-        return;
       }
-      set({ status: 'success', result: data, error: undefined });
     } catch (e: unknown) {
       console.error('윤문 결과 조회 실패:', e);
       
-      // 🔧 404 에러는 정상적인 상황으로 처리 (타입 안전하게)
+      // 🔧 기존 404 에러 처리 로직 유지 (하위 호환성)
       if (e && typeof e === 'object' && 'response' in e) {
         const errorResponse = e as ErrorResponse;
         if (errorResponse.response?.status === 404) {
@@ -84,9 +92,13 @@ export const usePolishStore = create<PolishState>((set, get) => ({
         }
       }
       
-      // 🔧 기타 에러는 error 상태로 처리
+      // ✅ 기타 에러는 한 번에 상태 업데이트
       const error = e instanceof Error ? e.message : '윤문 결과 조회에 실패했습니다.';
-      set({ status: 'error', error, result: undefined });
+      set({ 
+        status: 'error', 
+        error, 
+        result: undefined 
+      });
     }
   },
 

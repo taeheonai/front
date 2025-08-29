@@ -1,142 +1,259 @@
 'use client';
 
+import React, { useCallback } from 'react';
 import { usePolishStore } from '@/store/polishStore';
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface PolishResultProps {
   sessionKey: string;
   griIndex: string;
   showSaveHint?: boolean;
+  /** 🔧 추가: 표로 만든 마크다운을 앞에 붙여 렌더 */
+  prependMarkdown?: string;
 }
 
-export const PolishResult: React.FC<PolishResultProps> = ({ sessionKey, griIndex, showSaveHint = false }) => {
-  const { status, result, error, savedAt, fetchPolishResult } = usePolishStore((s) => ({
-    status: s.status,
-    result: s.result,
-    error: s.error,
-    savedAt: s.savedAt,
-    fetchPolishResult: s.fetchPolishResult,
-  }));
+// 🔧 공통 상태 메시지 컴포넌트 - React.memo로 최적화
+const StatusMessage = React.memo<{
+  type: 'info' | 'warning' | 'error' | 'success' | 'loading';
+  title: string;
+  message: string;
+  buttonText?: string;
+  onButtonClick?: () => void;
+  icon?: React.ReactNode;
+}>(function StatusMessage({ type, title, message, buttonText, onButtonClick, icon }) {
+  const getColorClasses = () => {
+    switch (type) {
+      case 'info':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'warning':
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'error':
+        return 'bg-red-50 text-red-700 border-red-200';
+      case 'success':
+        return 'bg-green-50 text-green-700 border-green-200';
+      case 'loading':
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+      default:
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
 
-  // 🔧 컴포넌트 마운트 상태 추적
-  const isMounted = useRef(true);
-  // 🔧 컴포넌트 레벨 에러 상태 관리
-  const [componentError, setComponentError] = useState<string | null>(null);
+  const getButtonColor = () => {
+    switch (type) {
+      case 'info':
+        return 'bg-blue-600 hover:bg-blue-700';
+      case 'warning':
+        return 'bg-yellow-600 hover:bg-yellow-700';
+      case 'error':
+        return 'bg-red-600 hover:bg-red-700';
+      case 'success':
+        return 'bg-green-600 hover:bg-green-700';
+      case 'loading':
+        return 'bg-gray-600 hover:bg-gray-700';
+      default:
+        return 'bg-gray-600 hover:bg-gray-700';
+    }
+  };
 
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+  return (
+    <div className={`p-4 border rounded-md ${getColorClasses()}`}>
+      <div className="flex items-center space-x-2">
+        {icon}
+        <span className="font-medium">{title}</span>
+      </div>
+      <p className="whitespace-pre-line mt-2">{message}</p>
+      {buttonText && onButtonClick && (
+        <button
+          onClick={onButtonClick}
+          className={`mt-3 px-4 py-2 text-white text-sm rounded-md transition-colors ${getButtonColor()}`}
+        >
+          {buttonText}
+        </button>
+      )}
+    </div>
+  );
+});
 
-  // 🔧 무한 루프 방지: useCallback으로 함수 안정화
+export const PolishResult: React.FC<PolishResultProps> = ({ 
+  sessionKey, 
+  griIndex, 
+  showSaveHint = false,
+  prependMarkdown = ''
+}) => {
+  // ✅ 셀렉터 안정화: useShallow로 객체 참조 안정화
+  const { status, result, error, savedAt } = usePolishStore(
+    useShallow(s => ({
+      status: s.status,
+      result: s.result,
+      error: s.error,
+      savedAt: s.savedAt,
+    }))
+  );
+  
+  // ✅ 액션은 별도 구독 (참조가 안정적이어야 함)
+  const fetchPolishResult = usePolishStore(s => s.fetchPolishResult);
+
+  // ✅ useCallback 의존성 최소화: fetchPolishResult는 스토어에서 안정적
   const stableFetchPolishResult = useCallback(async () => {
-    if (!isMounted.current || !sessionKey || !griIndex) return;
-    
+    if (!sessionKey || !griIndex) return;
     try {
-      setComponentError(null); // 에러 상태 초기화
       await fetchPolishResult(sessionKey, griIndex);
     } catch (error) {
-      // 🔧 컴포넌트가 언마운트된 경우 에러 무시
-      if (isMounted.current) {
-        console.error('윤문 결과 조회 실패:', error);
-        setComponentError('윤문 결과 조회 중 오류가 발생했습니다.');
-      }
+      console.error('윤문 결과 조회 실패:', error);
     }
-  }, [sessionKey, griIndex, fetchPolishResult]);
+  }, [sessionKey, griIndex, fetchPolishResult]); // ✅ fetchPolishResult 포함 (ESLint 규칙 준수)
 
-  useEffect(() => {
-    // 🔧 이미 결과가 있거나 로딩 중이면 API 호출하지 않음
-    // 🔧 초기 자동 호출 방지: 사용자가 명시적으로 요청할 때만 조회
-    if (sessionKey && griIndex && status === 'idle' && !result && isMounted.current) {
-      // 🔧 자동 호출 대신 사용자 액션 기반 호출로 변경
-      console.log('🔄 윤문 결과 자동 조회 비활성화 - 사용자 액션 기반으로 변경');
-    }
-  }, [sessionKey, griIndex, status, result]);
+  // ✅ 자동 호출 완전 비활성화 - 버튼 클릭으로만 실행
+  // useEffect(() => {}, [sessionKey, griIndex]); // 아무것도 안 함
 
-  // 🔧 컴포넌트가 언마운트된 경우 아무것도 렌더링하지 않음
-  if (!isMounted.current) {
-    return null;
-  }
-
-  // 🔧 컴포넌트 레벨 에러 처리
-  if (componentError) {
-    return (
-      <div className="p-4 bg-red-50 text-red-700 rounded-md">
-        <div className="flex items-center space-x-2">
-          <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <span className="font-medium">오류가 발생했습니다</span>
-        </div>
-        <p className="mt-2">{componentError}</p>
-        <button
-          onClick={() => setComponentError(null)}
-          className="mt-3 px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
-        >
-          다시 시도
-        </button>
+  // 🔧 마크다운 표 렌더링을 위한 커스텀 스타일
+  const markdownComponents = {
+    table: ({ children, ...props }: React.ComponentProps<'table'>) => (
+      <div className="overflow-x-auto my-4">
+        <table className="min-w-full border border-gray-300 rounded-lg overflow-hidden" {...props}>
+          {children}
+        </table>
       </div>
-    );
-  }
+    ),
+    thead: ({ children, ...props }: React.ComponentProps<'thead'>) => (
+      <thead className="bg-gray-50" {...props}>
+        {children}
+      </thead>
+    ),
+    tbody: ({ children, ...props }: React.ComponentProps<'tbody'>) => (
+      <tbody className="bg-white" {...props}>
+        {children}
+      </tbody>
+    ),
+    tr: ({ children, ...props }: React.ComponentProps<'tr'>) => (
+      <tr className="border-b border-gray-200" {...props}>
+        {children}
+      </tr>
+    ),
+    th: ({ children, ...props }: React.ComponentProps<'th'>) => (
+      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700" {...props}>
+        {children}
+      </th>
+    ),
+    td: ({ children, ...props }: React.ComponentProps<'td'>) => (
+      <td className="px-4 py-3 text-sm text-gray-900" {...props}>
+        {children}
+      </td>
+    ),
+  };
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        <span className="ml-2">윤문 결과를 불러오는 중...</span>
-      </div>
+      <StatusMessage
+        type="loading"
+        title="윤문 결과를 불러오는 중..."
+        message="잠시만 기다려주세요."
+        icon={
+          <svg className="h-5 w-5 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        }
+      />
     );
   }
 
   if (status === 'error') {
     return (
-      <div className="p-4 bg-red-50 text-red-700 rounded-md">
-        <p>오류: {error}</p>
-        {/* 🔧 404 에러일 때 사용자 친화적 메시지 */}
-        {error?.includes('404') && (
-          <p className="text-sm mt-2">아직 윤문 결과가 없습니다. 윤문을 실행해주세요.</p>
-        )}
+      <StatusMessage
+        type="error"
+        title="오류가 발생했습니다"
+        message={error || '알 수 없는 오류가 발생했습니다.'}
+        buttonText="다시 시도"
+        onButtonClick={stableFetchPolishResult}
+        icon={
+          <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        }
+      />
+    );
+  }
+
+  if (status === 'not_found') {
+    return (
+      <StatusMessage
+        type="info"
+        title="윤문 결과가 없습니다"
+        message="해당 항목에 대한 윤문 결과가 존재하지 않습니다."
+        buttonText="윤문 실행하기"
+        onButtonClick={stableFetchPolishResult}
+        icon={
+          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        }
+      />
+    );
+  }
+
+  if (status === 'success' && result?.polished_text) {
+    // 🔧 표 마크다운과 윤문 결과를 합쳐서 렌더링
+    const mergedMarkdown = 
+      (prependMarkdown?.trim() ? `${prependMarkdown.trim()}\n\n` : '') +
+      (typeof result.polished_text === 'string' 
+        ? result.polished_text 
+        : JSON.stringify(result.polished_text, null, 2));
+
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold mb-4">윤문 결과</h3>
+        <div className="prose max-w-none">
+          {/* 🔧 마크다운 렌더링으로 표 자동 변환 */}
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {mergedMarkdown}
+          </ReactMarkdown>
+        </div>
+        <div className="mt-4 text-sm text-gray-500 flex justify-between items-center">
+          {savedAt && <p>저장 시간: {new Date(savedAt).toLocaleString()}</p>}
+          {result.meta?.model && <p>모델: {result.meta.model}</p>}
+        </div>
       </div>
     );
   }
 
-  // 🔧 not_found 상태를 별도로 처리
-  if (status === 'not_found') {
+  // 🔧 idle 상태일 때 초기 안내 메시지
+  if (status === 'idle') {
     return (
-      <div className="p-4 bg-blue-50 text-blue-700 rounded-md">
-        <div className="flex items-center space-x-2">
+      <StatusMessage
+        type="info"
+        title="윤문 결과 확인"
+        message="윤문을 실행했거나 저장된 결과가 있는지 확인해보세요."
+        buttonText="윤문 결과 확인하기"
+        onButtonClick={stableFetchPolishResult}
+        icon={
           <svg className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="font-medium">윤문 결과가 없습니다</span>
-        </div>
-        <p className="mt-2">{error}</p>
-        <p className="text-sm mt-2 text-blue-600">
-          윤문을 실행하면 결과가 여기에 표시됩니다.
-        </p>
-        <button
-          onClick={() => stableFetchPolishResult()}
-          className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
-        >
-          윤문 결과 확인하기
-        </button>
-      </div>
+        }
+      />
     );
   }
 
   if (status !== 'success' || !result?.polished_text) {
     return (
-      <div className="p-4 bg-gray-50 text-gray-600 rounded-md">
-        <p>윤문 결과가 없습니다. 윤문을 실행해주세요.</p>
-        <button
-          onClick={() => stableFetchPolishResult()}
-          className="mt-3 px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition-colors"
-        >
-          윤문 결과 확인하기
-        </button>
-      </div>
+      <StatusMessage
+        type="info"
+        title="윤문 결과가 없습니다"
+        message="윤문을 실행해주세요."
+        buttonText="윤문 결과 확인하기"
+        onButtonClick={stableFetchPolishResult}
+        icon={
+          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        }
+      />
     );
   }
 
