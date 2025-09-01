@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { usePolishStore } from '@/store/polishStore';
 import { useShallow } from 'zustand/react/shallow';
 import ReactMarkdown from 'react-markdown';
@@ -10,7 +10,6 @@ import { filterMarkdown, KeepMode } from '@/lib/mdFilter';
 interface PolishResultProps {
   sessionKey: string;
   griIndex: string;
-  showSaveHint?: boolean;
   /** 표로 만든 마크다운을 윤문 결과 앞에 붙여서 렌더링 */
   prependMarkdown?: string;
   /** LLM 응답에서 어떤 부분을 보여줄지: 'tables' | 'prose' | 'both' | 'none' */
@@ -71,7 +70,6 @@ const StatusMessage = React.memo<{
 export const PolishResult: React.FC<PolishResultProps> = ({
   sessionKey,
   griIndex,
-  showSaveHint = false,
   prependMarkdown = '',
   keepFromLLM = 'both',
   stripHeads = [],
@@ -97,6 +95,13 @@ export const PolishResult: React.FC<PolishResultProps> = ({
       console.error('윤문 결과 조회 실패:', e);
     }
   }, [sessionKey, griIndex, fetchPolishResult]);
+
+  /* 컴포넌트 마운트 시 자동으로 데이터 가져오기 */
+  useEffect(() => {
+    if (sessionKey && griIndex && status === 'idle') {
+      stableFetchPolishResult();
+    }
+  }, [sessionKey, griIndex, status, stableFetchPolishResult]);
 
   /* 테이블 마크다운 렌더링 스타일 */
   const markdownComponents = {
@@ -240,7 +245,6 @@ export const PolishResult: React.FC<PolishResultProps> = ({
         </div>
         <div className="mt-4 text-sm text-gray-500 flex justify-between items-center">
           {savedAt && <p>저장 시간: {new Date(savedAt).toLocaleString()}</p>}
-          {showSaveHint && <p className="text-blue-600">* 저장 후 GRI Report 페이지에서 확인할 수 있습니다</p>}
         </div>
       </div>
     );
@@ -276,10 +280,9 @@ export const PolishResult: React.FC<PolishResultProps> = ({
       <div className="prose max-w-none">
         <div className="whitespace-pre-wrap">{polishedText}</div>
       </div>
-      <div className="mt-4 text-sm text-gray-500 flex justify-between items-center">
-        {savedAt && <p>저장 시간: {new Date(savedAt).toLocaleString()}</p>}
-        {showSaveHint && <p className="text-blue-600">* 저장 후 GRI Report 페이지에서 확인할 수 있습니다</p>}
-      </div>
+              <div className="mt-4 text-sm text-gray-500 flex justify-between items-center">
+          {savedAt && <p>저장 시간: {new Date(savedAt).toLocaleString()}</p>}
+        </div>
     </div>
   );
 };
